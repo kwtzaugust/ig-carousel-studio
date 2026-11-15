@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instagram Carousel Frame Builder</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- JSZip CDN for Lossless Sequential PNG ZIP Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Inter & JetBrains Mono Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            studio: {
+              950: '#09090b',
+              900: '#121215',
+              850: '#18181c',
+              800: '#222228',
+              700: '#32323a',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background-color: #09090b;
+      color: #f4f4f5;
+      overflow: hidden;
+    }
+    /* Custom subtle scrollbars for horizontal filmstrip */
+    ::-webkit-scrollbar {
+      height: 10px;
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #09090b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 9999px;
+      border: 2px solid #09090b;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3f3f46;
+    }
+    /* Checkerboard pattern for empty image slots */
+    .slot-empty-pattern {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 0);
+      background-size: 16px 16px;
+    }
+    .slot-active-ring {
+      box-shadow: inset 0 0 0 2px #6366f1, 0 0 0 1px rgba(99, 102, 241, 0.4);
+    }
+    .card-drag-over {
+      outline: 2px dashed #818cf8;
+      outline-offset: 6px;
+    }
+    input[type="range"] {
+      accent-color: #6366f1;
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="h-14 bg-studio-900 border-b border-studio-800 px-4 flex items-center justify-between gap-3 shrink-0 z-30">
+    <!-- Brand -->
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="3" y="3" width="18" height="18" rx="3" />
+          <path d="M12 3v18M3 12h9" />
+        </svg>
+      </div>
+      <div class="truncate">
+        <h1 class="text-sm font-semibold tracking-tight text-white truncate">IG Carousel Studio</h1>
+        <p class="text-[11px] text-zinc-400">Lossless sequence framer</p>
+      </div>
+    </div>
+
+    <!-- Right Controls: Settings Popover & Single Export Dropdown -->
+    <div class="flex items-center gap-2.5 shrink-0">
+      <!-- Settings Popover Wrapper -->
+      <div class="relative" id="settingsDropdownWrap">
+        <button id="settingsBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-studio-850 hover:bg-studio-800 text-zinc-200 border border-studio-700 flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </button>
+
+        <!-- Settings Popover Panel -->
+        <div id="settingsMenu" class="hidden absolute right-0 mt-2 w-80 bg-studio-900 border border-studio-700 rounded-xl shadow-2xl p-4 z-50 space-y-4">
+          <div class="flex items-center justify-between border-b border-studio-800 pb-2">
+            <span class="text-xs font-semibold text-zinc-100">Project & Default Settings</span>
+            <span class="text-[10px] font-mono text-zinc-500">sRGB Lossless</span>
+          </div>
+
+          <!-- Global Frame Settings -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <label for="aspectSelect" class="text-xs text-zinc-400">Frame Format</label>
+              <select id="aspectSelect" class="bg-studio-850 text-xs font-mono text-zinc-100 px-2.5 py-1 rounded-lg border border-studio-700 focus:outline-none focus:border-indigo-500 cursor-pointer">
+                <option value="1350" selected>4:5 (1080×1350)</option>
+                <option value="1440">3:4 (1080×1440)</option>
+                <option value="1920">9:16 (1080×1920)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <label for="scaleSelect" class="text-xs text-zinc-400">Output Resolution</label>
+              <select id="scaleSelect" class="bg-studio-850 text-xs font-mono text-zinc-100 px-2.5 py-1 rounded-lg border border-studio-700 focus:outline-none focus:border-indigo-500 cursor-pointer">
+                <option value="1" selected>1× Standard (1080w)</option>
+                <option value="2">2× Retina (2160w)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <label for="gapSlider" class="text-xs text-zinc-400">Slot Inner Gap</label>
+              <div class="flex items-center gap-2">
+                <input id="gapSlider" type="range" min="0" max="40" step="2" value="0" class="w-28 cursor-pointer" />
+                <span id="gapValueLabel" class="text-xs font-mono text-zinc-300 w-8 text-right">0px</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <label for="globalBgInput" class="text-xs text-zinc-400">Default Matte Color</label>
+              <div class="flex items-center gap-2">
+                <span id="globalBgHex" class="text-[11px] font-mono text-zinc-400">#FFFFFF</span>
+                <input id="globalBgInput" type="color" value="#ffffff" class="w-6 h-6 rounded cursor-pointer bg-transparent border border-studio-700" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Template D Default Settings -->
+          <div class="border-t border-studio-800 pt-3 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Template D Overlay Defaults</span>
+              <span class="text-[10px] font-mono text-indigo-400">4:5 (680×850)</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[10px] text-zinc-400 block mb-1">Width (px)</label>
+                <input id="defaultTplDW" type="number" min="160" max="1080" step="10" value="680" class="w-full bg-studio-850 text-xs font-mono text-zinc-100 px-2 py-1 rounded-lg border border-studio-700 focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label class="text-[10px] text-zinc-400 block mb-1">Height (px)</label>
+                <input id="defaultTplDH" type="number" min="160" max="1920" step="10" value="850" class="w-full bg-studio-850 text-xs font-mono text-zinc-100 px-2 py-1 rounded-lg border border-studio-700 focus:outline-none focus:border-indigo-500" />
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <label class="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer">
+                <input id="defaultTplDLock" type="checkbox" checked class="rounded border-studio-700 text-indigo-600 focus:ring-indigo-500" />
+                <span>Lock Aspect Ratio (4:5)</span>
+              </label>
+              <button id="resetTplDDefaultBtn" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium">Reset 4:5</button>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 pt-1">
+              <label class="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer">
+                <input id="defaultTplDShadow" type="checkbox" checked class="rounded border-studio-700 text-indigo-600 focus:ring-indigo-500" />
+                <span>Drop Shadow</span>
+              </label>
+              <label class="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer">
+                <input id="defaultTplDBorder" type="checkbox" class="rounded border-studio-700 text-indigo-600 focus:ring-indigo-500" />
+                <span>Matte Border</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Single Export Dropdown Button -->
+      <div class="relative" id="exportDropdownWrap">
+        <button id="exportMenuBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white shadow-lg shadow-indigo-600/25 flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Export</span>
+          <svg class="w-3 h-3 ml-0.5 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+
+        <div id="exportDropdownMenu" class="hidden absolute right-0 mt-2 w-56 bg-studio-900 border border-studio-700 rounded-xl shadow-2xl py-1.5 z-50">
+          <button id="exportZipOptionBtn" class="w-full px-3.5 py-2 text-left text-xs hover:bg-studio-800 flex items-center justify-between text-zinc-100 transition">
+            <div>
+              <div class="font-semibold">ZIP Archive (.zip)</div>
+              <div class="text-[10px] text-zinc-400">Numbered lossless PNG bundle</div>
+            </div>
+            <span class="text-[10px] font-mono bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">ZIP</span>
+          </button>
+          <div class="my-1 border-t border-studio-800"></div>
+          <button id="exportPngOptionBtn" class="w-full px-3.5 py-2 text-left text-xs hover:bg-studio-800 flex items-center justify-between text-zinc-100 transition">
+            <div>
+              <div class="font-semibold">Individual Files (.png)</div>
+              <div class="text-[10px] text-zinc-400">Sequential browser downloads</div>
+            </div>
+            <span class="text-[10px] font-mono bg-studio-800 text-zinc-300 px-1.5 py-0.5 rounded">PNG</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- SECONDARY BAR: TEMPLATE ADDER (A to F) & CONTEXTUAL ACTIVE SLOT INSPECTOR -->
+  <div class="min-h-16 bg-studio-900/75 border-b border-studio-800 px-4 py-1.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20 backdrop-blur-md">
+    <!-- Template Adder Buttons Ordered Simple -> Complex, Blank Matte Last (A, B, C, D, E, F) -->
+    <div class="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
+      <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mr-1 shrink-0">+ Add Frame:</span>
+
+      <!-- Template A: 1 Slot Full Frame -->
+      <button onclick="addFrameBlock('A')" class="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-studio-850 hover:bg-studio-800 border border-studio-700 hover:border-indigo-500/60 transition shrink-0">
+        <div class="w-4 h-5 rounded-[2px] border border-zinc-400 bg-zinc-700/50 group-hover:border-indigo-400 flex items-center justify-center">
+          <div class="w-2.5 h-3.5 rounded-[1px] bg-zinc-300/30"></div>
+        </div>
+        <div class="text-left">
+          <div class="text-xs font-semibold text-zinc-100 leading-none">Template A</div>
+          <div class="text-[10px] text-zinc-400 leading-tight mt-0.5">Full Frame (1)</div>
+        </div>
+      </button>
+
+      <!-- Template B: Top & Bottom (2 Slots) -->
+      <button onclick="addFrameBlock('B')" class="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-studio-850 hover:bg-studio-800 border border-studio-700 hover:border-indigo-500/60 transition shrink-0">
+        <div class="w-4 h-5 rounded-[2px] border border-zinc-400 flex flex-col overflow-hidden group-hover:border-indigo-400">
+          <div class="h-1/2 border-b border-zinc-400 group-hover:border-indigo-400 bg-zinc-700/40"></div>
+          <div class="h-1/2 bg-zinc-800/40"></div>
+        </div>
+        <div class="text-left">
+          <div class="text-xs font-semibold text-zinc-100 leading-none">Template B</div>
+          <div class="text-[10px] text-zinc-400 leading-tight mt-0.5">Top & Bottom (2)</div>
+        </div>
+      </button>
+
+      <!-- Template C: Top, Mid, Bottom (3 Slots) -->
+      <button onclick="addFrameBlock('C')" class="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-studio-850 hover:bg-studio-800 border border-studio-700 hover:border-indigo-500/60 transition shrink-0">
+        <div class="w-4 h-5 rounded-[2px] border border-zinc-400 flex flex-col overflow-hidden group-hover:border-indigo-400">
+          <div class="h-1/3 border-b border-zinc-400 group-hover:border-indigo-400 bg-zinc-700/40"></div>
+          <div class="h-1/3 border-b border-zinc-400 group-hover:border-indigo-400 bg-zinc-800/40"></div>
+          <div class="h-1/3 bg-zinc-700/40"></div>
+        </div>
+        <div class="text-left">
+          <div class="text-xs font-semibold text-zinc-100 leading-none">Template C</div>
+          <div class="text-[10px] text-zinc-400 leading-tight mt-0.5">Top, Mid, Bot (3)</div>
+        </div>
+      </button>
+
+      <!-- Template D: Background + Overlaid Foreground (2 Slots) -->
+      <button onclick="addFrameBlock('D')" class="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-studio-850 hover:bg-studio-800 border border-studio-700 hover:border-indigo-500/60 transition shrink-0">
+        <div class="w-4 h-5 rounded-[2px] border border-zinc-400 flex items-center justify-center bg-zinc-800/50 group-hover:border-indigo-400">
+          <div class="w-2.5 h-3 border border-zinc-200 bg-indigo-500/40 rounded-[1px]"></div>
+        </div>
+        <div class="text-left">
+          <div class="text-xs font-semibold text-zinc-100 leading-none">Template D</div>
+          <div class="text-[10px] text-zinc-400 leading-tight mt-0.5">BG + Overlay (2)</div>
+        </div>
+      </button>
+
+      <!-- Template E: 2-Frame Split Panorama (1 Slot across 2 Frames) -->
+      <button onclick="addFrameBlock('E')" class="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/40 hover:border-indigo-400 transition shrink-0">
+        <div class="w-8 h-5 rounded-[2px] border border-indigo-400 flex overflow-hidden bg-indigo-500/20 relative">
+          <div class="w-1/2 h-full border-r border-dashed border-indigo-300"></div>
+          <div class="w-1/2 h-full"></div>
+        </div>
+        <div class="text-left">
+          <div class="flex items-center gap-1">
+            <span class="text-xs font-semibold text-indigo-200 leading-none">Template E</span>
+            <span class="text-[9px] font-mono bg-indigo-500/30 text-indigo-200 px-1 rounded">2 FRAMES</span>
+          </div>
+          <div class="text-[10px] text-indigo-300/80 leading-tight mt-0.5">Panorama Split</div>
+        </div>
+      </button>
+
+      <!-- Template F: Blank Matte Frame (Last Position) -->
+      <button onclick="addFrameBlock('F')" class="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-studio-850 hover:bg-studio-800 border border-studio-700 hover:border-indigo-500/60 transition shrink-0">
+        <div class="w-4 h-5 rounded-[2px] border border-zinc-400 bg-zinc-100/90 group-hover:border-indigo-400"></div>
+        <div class="text-left">
+          <div class="text-xs font-semibold text-zinc-100 leading-none">Template F</div>
+          <div class="text-[10px] text-zinc-400 leading-tight mt-0.5">Blank Matte</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Contextual Active Slot Inspector HUD -->
+    <div id="slotInspectorHud" class="hidden flex-wrap items-center gap-2.5 bg-studio-950 border border-indigo-500/40 px-3 py-1.5 rounded-xl shadow-lg shrink-0">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+        <span id="activeSlotTitle" class="text-xs font-medium text-indigo-200">Slot Selected</span>
+      </div>
+
+      <!-- Image Scale Controls (Visible when slot has a photo loaded) -->
+      <div id="photoScaleControls" class="hidden items-center gap-2 border-l border-studio-800 pl-2.5">
+        <span class="text-[11px] text-zinc-400">Scale</span>
+        <input id="activeZoomSlider" type="range" min="1" max="4" step="0.01" value="1" class="w-20 sm:w-24 cursor-pointer" />
+        <span id="activeZoomLabel" class="text-xs font-mono text-zinc-200 w-11 text-right">1.00×</span>
+      </div>
+
+      <!-- Template D Center-Anchored Foreground Box Size & Style Controls -->
+      <div id="overlayToggleWrap" class="hidden items-center gap-2 border-l border-studio-800 pl-2.5">
+        <span class="text-[11px] text-zinc-400">Box</span>
+        <input id="activeOverlayWInput" type="number" min="160" max="1080" step="10" class="w-14 bg-studio-850 text-xs font-mono text-zinc-100 px-1.5 py-0.5 rounded border border-studio-700 focus:outline-none focus:border-indigo-500" title="Foreground Box Width (px)" />
+        <span class="text-[10px] text-zinc-500">×</span>
+        <input id="activeOverlayHInput" type="number" min="160" max="1920" step="10" class="w-14 bg-studio-850 text-xs font-mono text-zinc-100 px-1.5 py-0.5 rounded border border-studio-700 focus:outline-none focus:border-indigo-500" title="Foreground Box Height (px)" />
+        <span class="text-[10px] font-mono text-zinc-500">px</span>
+
+        <!-- Lock Aspect Ratio Toggle Button -->
+        <button id="toggleOverlayLockBtn" class="px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 transition flex items-center gap-1" title="Lock/Unlock aspect ratio when resizing foreground box">
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span id="overlayLockLabel">Locked</span>
+        </button>
+
+        <button id="toggleOverlayShadowBtn" class="px-2 py-0.5 rounded text-[11px] font-medium bg-studio-800 hover:bg-studio-700 text-zinc-200 border border-studio-700 transition">
+          Shadow: ON
+        </button>
+        <button id="toggleOverlayBorderBtn" class="px-2 py-0.5 rounded text-[11px] font-medium bg-studio-800 hover:bg-studio-700 text-zinc-200 border border-studio-700 transition">
+          Border: OFF
+        </button>
+      </div>
+
+      <!-- Recenter / Replace / Clear Slot Buttons -->
+      <div id="photoActionButtons" class="hidden items-center gap-1.5 border-l border-studio-800 pl-2.5">
+        <button id="resetSlotFitBtn" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-studio-850 hover:bg-studio-800 text-zinc-300 border border-studio-700 transition" title="Reset to centered 1.0x cover fit">
+          Center Fit
+        </button>
+        <button id="replaceSlotPhotoBtn" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 transition">
+          Replace
+        </button>
+        <button id="clearSlotPhotoBtn" class="px-2 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 transition" title="Remove photo from this slot">
+          Clear
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN HORIZONTAL CAROUSEL WORKSPACE -->
+  <main id="workspaceContainer" class="flex-1 overflow-x-auto overflow-y-auto flex items-center px-10 py-8 relative select-none">
+    <!-- Carousel Strip Container -->
+    <div id="carouselStrip" class="flex items-start gap-7 mx-auto my-auto py-4">
+      <!-- Dynamically populated by renderWorkspace() -->
+    </div>
+  </main>
+
+  <!-- BOTTOM STATUS BAR & WORKSPACE ZOOM CONTROLS -->
+  <footer class="h-11 bg-studio-900 border-t border-studio-800 px-4 flex items-center justify-between text-xs text-zinc-400 shrink-0 z-20">
+    <!-- Left Sequence Summary -->
+    <div class="flex items-center gap-3">
+      <span id="sequenceSummaryText" class="font-mono text-zinc-300">5 Export Frames • 4 Blocks</span>
+      <span class="hidden md:inline text-zinc-600">|</span>
+      <span class="hidden md:inline text-[11px] text-zinc-400">
+        Tip: Drop photos into any slot. Drag to pan, or scroll mouse wheel / trackpad to scale in and out.
+      </span>
+    </div>
+
+    <!-- Right Reset & Workspace Preview Scale -->
+    <div class="flex items-center gap-3">
+      <button id="clearAllFramesBtn" class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-studio-850 hover:bg-rose-950/50 text-zinc-400 hover:text-rose-300 border border-studio-700 transition">
+        Reset Strip
+      </button>
+
+      <div class="h-4 w-[1px] bg-studio-800"></div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] text-zinc-400">Preview Size</span>
+        <input id="previewScaleSlider" type="range" min="0.18" max="0.48" step="0.01" value="0.28" class="w-24 cursor-pointer" />
+        <span id="previewScaleLabel" class="font-mono text-[11px] text-zinc-300 w-9 text-right">28%</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- HIDDEN FILE INPUT FOR CLICK-TO-UPLOAD -->
+  <input id="hiddenFileInput" type="file" accept="image/*" class="hidden" />
+
+  <!-- EXPORT PROGRESS & STATUS TOAST -->
+  <div id="statusToast" class="fixed bottom-14 right-5 z-50 hidden items-center gap-2.5 bg-studio-900/95 border border-indigo-500/50 text-zinc-100 px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md">
+    <div id="toastSpinner" class="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin hidden"></div>
+    <span id="toastMessage" class="text-xs font-medium">Ready</span>
+  </div>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    /***************************************************************************
+     * 1. CORE APPLICATION STATE & CONSTANTS
+     ***************************************************************************/
+    const BASE_FRAME_WIDTH = 1080;
+    const MATTE_SWATCHES = ['#ffffff', '#09090b', '#f4f1ea', '#1e293b', '#fef2f2', '#eef2ff'];
+
+    const state = {
+      frameHeight: 1350,        // 1350 (4:5), 1440 (3:4), or 1920 (9:16)
+      exportScale: 1,           // 1 (1080px wide) or 2 (2160px Retina)
+      slotGap: 0,               // 0px to 40px padding/gap
+      defaultBgColor: '#ffffff',
+      // Template D Foreground Overlay Defaults (4:5 aspect ratio = 680x850)
+      defaultOverlayW: 680,
+      defaultOverlayH: 850,
+      defaultOverlayLockAspect: true,
+      defaultOverlayShadow: true,
+      defaultOverlayBorder: false,
+      previewScale: 0.28,       // UI workspace scale factor
+      blocks: [],               // Ordered array of FrameBlock items
+      activeSelection: null,    // { blockId, slotKey }
+      draggedBlockIndex: null   // For reordering blocks via HTML5 drag-and-drop
+    };
+
+    // Cache loaded HTMLImageElements by objectUrl for instant canvas rendering
+    const imageElementCache = new Map();
+
+    /***************************************************************************
+     * 2. TEMPLATE GEOMETRY DEFINITIONS (ORDERED A -> F)
+     *    A: Full Frame (1 slot)
+     *    B: Top & Bottom (2 slots)
+     *    C: Top, Mid, Bottom (3 slots)
+     *    D: BG + Overlaid Foreground (2 slots, center-anchored resizable FG)
+     *    E: 2-Frame Panorama Split (1 slot spanning 2160 x H across 2 frames)
+     *    F: Blank Matte Frame (0 photo slots, positioned last)
+     ***************************************************************************/
+    function getTemplateSlotRects(blockOrTemplate, frameHeight, gap) {
+      const templateType = typeof blockOrTemplate === 'string' ? blockOrTemplate : blockOrTemplate.template;
+      const blockObj = typeof blockOrTemplate === 'object' ? blockOrTemplate : null;
+      const W = BASE_FRAME_WIDTH;
+      const H = frameHeight;
+      const g = gap;
+
+      switch (templateType) {
+        case 'A': {
+          return [
+            { key: 'full', label: 'Full Frame', x: g, y: g, w: W - g * 2, h: H - g * 2, zIndex: 1 }
+          ];
+        }
+        case 'B': {
+          const halfH = (H - g * 3) / 2;
+          return [
+            { key: 'top', label: 'Top Slot', x: g, y: g, w: W - g * 2, h: halfH, zIndex: 1 },
+            { key: 'bottom', label: 'Bottom Slot', x: g, y: g * 2 + halfH, w: W - g * 2, h: halfH, zIndex: 1 }
+          ];
+        }
+        case 'C': {
+          const thirdH = (H - g * 4) / 3;
+          return [
+            { key: 'top', label: 'Top Slot', x: g, y: g, w: W - g * 2, h: thirdH, zIndex: 1 },
+            { key: 'mid', label: 'Middle Slot', x: g, y: g * 2 + thirdH, w: W - g * 2, h: thirdH, zIndex: 1 },
+            { key: 'bottom', label: 'Bottom Slot', x: g, y: g * 3 + thirdH * 2, w: W - g * 2, h: thirdH, zIndex: 1 }
+          ];
+        }
+        case 'D': {
+          const fgSlot = blockObj && blockObj.slots && blockObj.slots.fg ? blockObj.slots.fg : null;
+          const rawW = fgSlot && fgSlot.customW ? fgSlot.customW : state.defaultOverlayW;
+          const rawH = fgSlot && fgSlot.customH ? fgSlot.customH : state.defaultOverlayH;
+          const fgW = Math.max(160, Math.min(W, Math.round(rawW)));
+          const fgH = Math.max(160, Math.min(H, Math.round(rawH)));
+          // Always center-anchored
+          const fgX = Math.round((W - fgW) / 2);
+          const fgY = Math.round((H - fgH) / 2);
+          return [
+            { key: 'bg', label: 'Background', x: g, y: g, w: W - g * 2, h: H - g * 2, zIndex: 1 },
+            { key: 'fg', label: 'Overlay Box', x: fgX, y: fgY, w: fgW, h: fgH, zIndex: 2, isOverlay: true }
+          ];
+        }
+        case 'E': {
+          const dualW = W * 2;
+          return [
+            { key: 'panorama', label: '2-Frame Panorama', x: g, y: g, w: dualW - g * 2, h: H - g * 2, zIndex: 1 }
+          ];
+        }
+        case 'F':
+        default:
+          return [];
+      }
+    }
+
+    function createFrameBlock(templateType, customBg = null) {
+      const slotDefs = getTemplateSlotRects(templateType, state.frameHeight, state.slotGap);
+      const slots = {};
+      slotDefs.forEach(def => {
+        slots[def.key] = {
+          key: def.key,
+          objectUrl: null,
+          fileName: null,
+          naturalWidth: 0,
+          naturalHeight: 0,
+          zoom: 1.0,
+          panX: 0,
+          panY: 0,
+          customW: def.isOverlay ? state.defaultOverlayW : null,
+          customH: def.isOverlay ? state.defaultOverlayH : null,
+          lockAspect: def.isOverlay ? state.defaultOverlayLockAspect : true,
+          aspectRatio: def.isOverlay ? (state.defaultOverlayW / state.defaultOverlayH) : 0.8,
+          overlayShadow: state.defaultOverlayShadow,
+          overlayBorder: state.defaultOverlayBorder
+        };
+      });
+
+      return {
+        id: 'blk_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36),
+        template: templateType,
+        bgColor: customBg || state.defaultBgColor,
+        slots
+      };
+    }
+
+    // Center-anchored resize helper for Template D foreground slot
+    function applyOverlayDimensions(slotData, targetW, targetH, editedAxis = 'w') {
+      const maxW = BASE_FRAME_WIDTH;
+      const maxH = state.frameHeight;
+      let w = Math.max(160, Math.min(maxW, Math.round(targetW)));
+      let h = Math.max(160, Math.min(maxH, Math.round(targetH)));
+
+      if (slotData.lockAspect) {
+        const ratio = slotData.aspectRatio || (state.defaultOverlayW / state.defaultOverlayH) || 0.8;
+        if (editedAxis === 'w') {
+          h = Math.round(w / ratio);
+          if (h > maxH) {
+            h = maxH;
+            w = Math.round(h * ratio);
+          }
+          if (h < 160) {
+            h = 160;
+            w = Math.round(h * ratio);
+          }
+        } else {
+          w = Math.round(h * ratio);
+          if (w > maxW) {
+            w = maxW;
+            h = Math.round(w / ratio);
+          }
+          if (w < 160) {
+            w = 160;
+            h = Math.round(w / ratio);
+          }
+        }
+      } else {
+        slotData.aspectRatio = w / h;
+      }
+
+      slotData.customW = w;
+      slotData.customH = h;
+    }
+
+    /***************************************************************************
+     * 3. COVER-FIT & CLAMPING MATH ENGINE
+     *    Ensures the image always fills 100% of its slot with locked aspect ratio.
+     ***************************************************************************/
+    function computeSlotCoverMetrics(slotData, slotRect) {
+      if (!slotData || !slotData.objectUrl || !slotData.naturalWidth || !slotData.naturalHeight) {
+        return null;
+      }
+
+      const imgW = slotData.naturalWidth;
+      const imgH = slotData.naturalHeight;
+      const slotW = Math.max(1, slotRect.w);
+      const slotH = Math.max(1, slotRect.h);
+
+      // Minimum scale so the image covers both width and height of the slot
+      const minCoverScale = Math.max(slotW / imgW, slotH / imgH);
+      const zoom = Math.max(1.0, Math.min(4.0, slotData.zoom || 1.0));
+      const effectiveScale = minCoverScale * zoom;
+
+      const renderedW = imgW * effectiveScale;
+      const renderedH = imgH * effectiveScale;
+
+      // Maximum pan travel in either direction from center before an edge is exposed
+      const maxPanX = Math.max(0, (renderedW - slotW) / 2);
+      const maxPanY = Math.max(0, (renderedH - slotH) / 2);
+
+      const clampedPanX = Math.max(-maxPanX, Math.min(maxPanX, slotData.panX || 0));
+      const clampedPanY = Math.max(-maxPanY, Math.min(maxPanY, slotData.panY || 0));
+
+      // Keep state synchronized with clamped coordinates
+      slotData.panX = clampedPanX;
+      slotData.panY = clampedPanY;
+      slotData.zoom = zoom;
+
+      // Top-left draw coordinates relative to the slot's (0, 0) origin
+      const drawX = (slotW - renderedW) / 2 + clampedPanX;
+      const drawY = (slotH - renderedH) / 2 + clampedPanY;
+
+      return {
+        minCoverScale,
+        effectiveScale,
+        renderedW,
+        renderedH,
+        drawX,
+        drawY,
+        maxPanX,
+        maxPanY
+      };
+    }
+
+    /***************************************************************************
+     * 4. IMAGE LOADING HELPER (ZERO COMPRESSION)
+     ***************************************************************************/
+    function loadImageintoSlot(blockId, slotKey, fileOrUrl, displayName = 'Photo') {
+      const block = state.blocks.find(b => b.id === blockId);
+      if (!block || !block.slots[slotKey]) return Promise.resolve();
+
+      return new Promise((resolve) => {
+        let objectUrl = '';
+        let isRemote = typeof fileOrUrl === 'string';
+
+        if (isRemote) {
+          objectUrl = fileOrUrl;
+        } else {
+          objectUrl = URL.createObjectURL(fileOrUrl);
+          displayName = fileOrUrl.name || 'Local Photo';
+        }
+
+        const img = new Image();
+        if (isRemote) {
+          img.crossOrigin = 'anonymous';
+        }
+
+        img.onload = () => {
+          imageElementCache.set(objectUrl, img);
+          const slot = block.slots[slotKey];
+          slot.objectUrl = objectUrl;
+          slot.fileName = displayName;
+          slot.naturalWidth = img.naturalWidth || img.width;
+          slot.naturalHeight = img.naturalHeight || img.height;
+          slot.zoom = 1.0;
+          slot.panX = 0;
+          slot.panY = 0;
+
+          state.activeSelection = { blockId, slotKey };
+          renderWorkspace();
+          updateInspectorHud();
+          resolve(true);
+        };
+
+        img.onerror = () => {
+          showToast('Could not load image file. Please try another photo.', false);
+          resolve(false);
+        };
+
+        img.src = objectUrl;
+      });
+    }
+
+    /***************************************************************************
+     * 5. WORKSPACE RENDERER & INTERACTIVE GESTURES
+     ***************************************************************************/
+    function renderWorkspace() {
+      const strip = document.getElementById('carouselStrip');
+      strip.innerHTML = '';
+
+      let currentFrameNumber = 1;
+      const pScale = state.previewScale;
+
+      state.blocks.forEach((block, blockIndex) => {
+        const isPanorama = block.template === 'E';
+        const frameSpan = isPanorama ? 2 : 1;
+        const startFrameNum = currentFrameNumber;
+        const endFrameNum = currentFrameNumber + frameSpan - 1;
+        currentFrameNumber += frameSpan;
+
+        const baseBlockWidth = BASE_FRAME_WIDTH * frameSpan;
+        const baseBlockHeight = state.frameHeight;
+        const displayW = Math.round(baseBlockWidth * pScale);
+        const displayH = Math.round(baseBlockHeight * pScale);
+
+        // Card Wrapper
+        const card = document.createElement('div');
+        card.className = 'flex flex-col gap-2.5 shrink-0 transition-transform duration-150';
+        card.dataset.blockId = block.id;
+
+        // Card Header Bar (Drag Handle, Frame Number Badge, Template Switcher, Reorder & Delete)
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between gap-2 px-1';
+
+        // Left: Drag Handle + Sequential Frame Badge
+        const badgeWrap = document.createElement('div');
+        badgeWrap.className = 'flex items-center gap-1.5 cursor-grab active:cursor-grabbing bg-studio-900 border border-studio-800 px-2.5 py-1 rounded-lg shadow-sm';
+        badgeWrap.draggable = true;
+        badgeWrap.title = 'Drag to reorder this frame block';
+
+        badgeWrap.addEventListener('dragstart', (e) => {
+          state.draggedBlockIndex = blockIndex;
+          e.dataTransfer.effectAllowed = 'move';
+          card.classList.add('opacity-50');
+        });
+        badgeWrap.addEventListener('dragend', () => {
+          state.draggedBlockIndex = null;
+          card.classList.remove('opacity-50');
+          document.querySelectorAll('.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
+        });
+
+        const frameLabelText = isPanorama
+          ? `FRAMES ${String(startFrameNum).padStart(2, '0')} & ${String(endFrameNum).padStart(2, '0')}`
+          : `FRAME ${String(startFrameNum).padStart(2, '0')}`;
+
+        badgeWrap.innerHTML = `
+          <svg class="w-3.5 h-3.5 text-zinc-500" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+          </svg>
+          <span class="text-[11px] font-mono font-semibold ${isPanorama ? 'text-indigo-300' : 'text-zinc-200'}">${frameLabelText}</span>
+        `;
+
+        // Right: Template Switcher, Per-Block Matte Color, Move Left/Right, Duplicate, Delete
+        const controls = document.createElement('div');
+        controls.className = 'flex items-center gap-1 bg-studio-900 border border-studio-800 px-1.5 py-1 rounded-lg';
+
+        // Template Dropdown (A to F)
+        const tplSelect = document.createElement('select');
+        tplSelect.className = 'bg-studio-850 text-[10px] font-mono text-zinc-200 px-1.5 py-0.5 rounded border border-studio-700 focus:outline-none focus:border-indigo-500 cursor-pointer mr-0.5';
+        tplSelect.title = 'Switch template for this block (preserves loaded photos)';
+        const tplLabels = {
+          A: 'Tpl A • Full',
+          B: 'Tpl B • Top/Bot',
+          C: 'Tpl C • 3-Split',
+          D: 'Tpl D • Overlay',
+          E: 'Tpl E • 2-Frame',
+          F: 'Tpl F • Blank'
+        };
+        ['A', 'B', 'C', 'D', 'E', 'F'].forEach(tKey => {
+          const opt = document.createElement('option');
+          opt.value = tKey;
+          opt.textContent = tplLabels[tKey];
+          if (block.template === tKey) opt.selected = true;
+          tplSelect.appendChild(opt);
+        });
+        tplSelect.addEventListener('change', (e) => {
+          switchBlockTemplate(block.id, e.target.value);
+        });
+        controls.appendChild(tplSelect);
+
+        // Per-frame Matte Color Input
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = block.bgColor;
+        colorInput.title = 'Frame background matte color';
+        colorInput.className = 'w-4 h-4 rounded cursor-pointer bg-transparent border-0 p-0 mr-0.5';
+        colorInput.addEventListener('input', (e) => {
+          block.bgColor = e.target.value;
+          stage.style.backgroundColor = block.bgColor;
+        });
+        controls.appendChild(colorInput);
+
+        // Move Left Button
+        const leftBtn = document.createElement('button');
+        leftBtn.className = `p-1 rounded hover:bg-studio-800 text-zinc-400 hover:text-white transition ${blockIndex === 0 ? 'opacity-25 pointer-events-none' : ''}`;
+        leftBtn.title = 'Move Frame Left';
+        leftBtn.innerHTML = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`;
+        leftBtn.addEventListener('click', () => moveBlock(blockIndex, -1));
+        controls.appendChild(leftBtn);
+
+        // Move Right Button
+        const rightBtn = document.createElement('button');
+        rightBtn.className = `p-1 rounded hover:bg-studio-800 text-zinc-400 hover:text-white transition ${blockIndex === state.blocks.length - 1 ? 'opacity-25 pointer-events-none' : ''}`;
+        rightBtn.title = 'Move Frame Right';
+        rightBtn.innerHTML = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`;
+        rightBtn.addEventListener('click', () => moveBlock(blockIndex, 1));
+        controls.appendChild(rightBtn);
+
+        // Duplicate Block Button
+        const dupBtn = document.createElement('button');
+        dupBtn.className = 'p-1 rounded hover:bg-studio-800 text-zinc-400 hover:text-white transition';
+        dupBtn.title = 'Duplicate Frame Block';
+        dupBtn.innerHTML = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        dupBtn.addEventListener('click', () => duplicateBlock(blockIndex));
+        controls.appendChild(dupBtn);
+
+        // Delete Block Button
+        const delBtn = document.createElement('button');
+        delBtn.className = 'p-1 rounded hover:bg-rose-950/60 text-zinc-400 hover:text-rose-400 transition';
+        delBtn.title = 'Delete Frame Block';
+        delBtn.innerHTML = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+        delBtn.addEventListener('click', () => deleteBlock(blockIndex));
+        controls.appendChild(delBtn);
+
+        header.appendChild(badgeWrap);
+        header.appendChild(controls);
+        card.appendChild(header);
+
+        // Card Drag-over Target Listeners for Reordering
+        card.addEventListener('dragover', (e) => {
+          if (state.draggedBlockIndex !== null && state.draggedBlockIndex !== blockIndex) {
+            e.preventDefault();
+            card.classList.add('card-drag-over');
+          }
+        });
+        card.addEventListener('dragleave', () => {
+          card.classList.remove('card-drag-over');
+        });
+        card.addEventListener('drop', (e) => {
+          card.classList.remove('card-drag-over');
+          if (state.draggedBlockIndex !== null && state.draggedBlockIndex !== blockIndex) {
+            e.preventDefault();
+            const fromIdx = state.draggedBlockIndex;
+            state.draggedBlockIndex = null;
+            const [moved] = state.blocks.splice(fromIdx, 1);
+            state.blocks.splice(blockIndex, 0, moved);
+            renderWorkspace();
+          }
+        });
+
+        // Visual Frame Canvas Stage
+        const stage = document.createElement('div');
+        stage.className = 'relative overflow-hidden shadow-2xl ring-1 ring-white/15 transition-all';
+        stage.style.width = `${displayW}px`;
+        stage.style.height = `${displayH}px`;
+        stage.style.backgroundColor = block.bgColor;
+
+        // Template F: Blank Matte Frame interactive swatches overlay
+        if (block.template === 'F') {
+          const blankOverlay = document.createElement('div');
+          blankOverlay.className = 'absolute inset-0 flex flex-col items-center justify-center p-4 text-center opacity-0 hover:opacity-100 transition-opacity bg-black/35 backdrop-blur-[1px]';
+          
+          const swatchBar = document.createElement('div');
+          swatchBar.className = 'flex items-center gap-1.5 mt-3 bg-studio-900/90 p-1.5 rounded-full border border-white/15';
+          MATTE_SWATCHES.forEach(hex => {
+            const sw = document.createElement('button');
+            sw.className = 'w-5 h-5 rounded-full border border-white/30 transition transform hover:scale-110';
+            sw.style.backgroundColor = hex;
+            sw.title = `Set matte to ${hex}`;
+            sw.addEventListener('click', () => {
+              block.bgColor = hex;
+              colorInput.value = hex;
+              stage.style.backgroundColor = hex;
+            });
+            swatchBar.appendChild(sw);
+          });
+
+          blankOverlay.innerHTML = `
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-studio-900/90 text-zinc-100 border border-white/15">Template F • Blank Matte</span>
+            <span class="text-[11px] text-zinc-200 mt-1">Solid visual breather frame</span>
+          `;
+          blankOverlay.appendChild(swatchBar);
+          stage.appendChild(blankOverlay);
+        }
+
+        // Render Interactive Photo Slots for Templates A, B, C, D, E
+        const slotRects = getTemplateSlotRects(block, state.frameHeight, state.slotGap);
+        slotRects.forEach(slotRect => {
+          const slotData = block.slots[slotRect.key];
+          const isSelected = state.activeSelection &&
+            state.activeSelection.blockId === block.id &&
+            state.activeSelection.slotKey === slotRect.key;
+
+          const slotEl = document.createElement('div');
+          slotEl.className = `absolute overflow-hidden transition-shadow ${
+            slotData && slotData.objectUrl ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer slot-empty-pattern bg-studio-900/85 hover:bg-studio-850/90'
+          } ${isSelected ? 'slot-active-ring' : 'ring-1 ring-black/20'}`;
+
+          slotEl.style.left = `${ slotRect.x * pScale }px`;
+          slotEl.style.top = `${ slotRect.y * pScale }px`;
+          slotEl.style.width = `${ slotRect.w * pScale }px`;
+          slotEl.style.height = `${ slotRect.h * pScale }px`;
+          slotEl.style.zIndex = slotRect.zIndex || 1;
+
+          // Apply Optional Shadow & Border for Template D Foreground Overlay
+          if (slotRect.isOverlay && slotData) {
+            if (slotData.overlayShadow) {
+              slotEl.style.boxShadow = isSelected
+                ? 'inset 0 0 0 2px #6366f1, 0 20px 45px rgba(0,0,0,0.65)'
+                : '0 20px 45px rgba(0,0,0,0.65)';
+            }
+            if (slotData.overlayBorder) {
+              slotEl.style.border = `${Math.max(2, Math.round(12 * pScale))}px solid ${block.bgColor}`;
+            }
+          }
+
+          // File Drag-and-Drop from Finder
+          slotEl.addEventListener('dragover', (e) => {
+            if (state.draggedBlockIndex === null) {
+              e.preventDefault();
+              e.stopPropagation();
+              slotEl.classList.add('slot-active-ring');
+            }
+          });
+          slotEl.addEventListener('dragleave', () => {
+            if (!isSelected) slotEl.classList.remove('slot-active-ring');
+          });
+          slotEl.addEventListener('drop', (e) => {
+            if (state.draggedBlockIndex !== null) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length > 0 && files[0].type.startsWith('image/')) {
+              loadImageintoSlot(block.id, slotRect.key, files[0]);
+            }
+          });
+
+          let imgEl = null;
+          let hudBadge = null;
+
+          if (slotData && slotData.objectUrl) {
+            const metrics = computeSlotCoverMetrics(slotData, slotRect);
+            imgEl = document.createElement('img');
+            imgEl.src = slotData.objectUrl;
+            imgEl.draggable = false;
+            imgEl.className = 'absolute max-w-none pointer-events-none select-none';
+            if (metrics) {
+              imgEl.style.width = `${metrics.renderedW * pScale}px`;
+              imgEl.style.height = `${metrics.renderedH * pScale}px`;
+              imgEl.style.left = `${metrics.drawX * pScale}px`;
+              imgEl.style.top = `${metrics.drawY * pScale}px`;
+            }
+            slotEl.appendChild(imgEl);
+
+            // Subtle corner badge showing current zoom & slot label on hover
+            hudBadge = document.createElement('div');
+            hudBadge.className = 'absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-mono text-zinc-200 pointer-events-none opacity-0 hover:opacity-100 transition-opacity';
+            hudBadge.textContent = `${slotData.zoom.toFixed(2)}×`;
+            slotEl.appendChild(hudBadge);
+
+            // Pointer Drag to Pan inside Slot
+            slotEl.addEventListener('pointerdown', (e) => {
+              if (e.button !== 0 || e.target.dataset.resizeHandle) return;
+              e.stopPropagation();
+              state.activeSelection = { blockId: block.id, slotKey: slotRect.key };
+              updateInspectorHud();
+
+              // Highlight active ring without full DOM rebuild during drag
+              document.querySelectorAll('.slot-active-ring').forEach(el => el.classList.remove('slot-active-ring'));
+              slotEl.classList.add('slot-active-ring');
+
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const initialPanX = slotData.panX || 0;
+              const initialPanY = slotData.panY || 0;
+
+              slotEl.setPointerCapture(e.pointerId);
+
+              const onPointerMove = (moveEvt) => {
+                const dxBase = (moveEvt.clientX - startX) / pScale;
+                const dyBase = (moveEvt.clientY - startY) / pScale;
+                slotData.panX = initialPanX + dxBase;
+                slotData.panY = initialPanY + dyBase;
+                const currentRect = getTemplateSlotRects(block, state.frameHeight, state.slotGap)
+                  .find(r => r.key === slotRect.key) || slotRect;
+                const updatedMetrics = computeSlotCoverMetrics(slotData, currentRect);
+                if (updatedMetrics) {
+                  imgEl.style.width = `${updatedMetrics.renderedW * pScale}px`;
+                  imgEl.style.height = `${updatedMetrics.renderedH * pScale}px`;
+                  imgEl.style.left = `${updatedMetrics.drawX * pScale}px`;
+                  imgEl.style.top = `${updatedMetrics.drawY * pScale}px`;
+                }
+              };
+
+              const onPointerUp = (upEvt) => {
+                slotEl.releasePointerCapture(upEvt.pointerId);
+                slotEl.removeEventListener('pointermove', onPointerMove);
+                slotEl.removeEventListener('pointerup', onPointerUp);
+              };
+
+              slotEl.addEventListener('pointermove', onPointerMove);
+              slotEl.addEventListener('pointerup', onPointerUp);
+            });
+
+            // Double-click to recenter & reset zoom to 1.0x
+            slotEl.addEventListener('dblclick', (e) => {
+              if (e.target.dataset.resizeHandle) return;
+              e.stopPropagation();
+              slotData.zoom = 1.0;
+              slotData.panX = 0;
+              slotData.panY = 0;
+              renderWorkspace();
+              updateInspectorHud();
+            });
+
+            // Mouse Wheel Scroll & Mac Trackpad Pinch-to-Zoom inside Slot
+            slotEl.addEventListener('wheel', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              state.activeSelection = { blockId: block.id, slotKey: slotRect.key };
+
+              // Normalize wheel delta across standard mouse wheels (deltaMode=1) and high-precision trackpads (deltaMode=0)
+              const rawDelta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+              const pixelDelta = e.deltaMode === 1 ? rawDelta * 28 : rawDelta;
+              const sensitivity = e.ctrlKey ? -0.012 : -0.0025;
+              const nextZoom = Math.max(1.0, Math.min(4.0, (slotData.zoom || 1.0) + pixelDelta * sensitivity));
+              slotData.zoom = nextZoom;
+
+              const currentRect = getTemplateSlotRects(block, state.frameHeight, state.slotGap)
+                .find(r => r.key === slotRect.key) || slotRect;
+              const updatedMetrics = computeSlotCoverMetrics(slotData, currentRect);
+              if (updatedMetrics) {
+                imgEl.style.width = `${updatedMetrics.renderedW * pScale}px`;
+                imgEl.style.height = `${updatedMetrics.renderedH * pScale}px`;
+                imgEl.style.left = `${updatedMetrics.drawX * pScale}px`;
+                imgEl.style.top = `${updatedMetrics.drawY * pScale}px`;
+                hudBadge.textContent = `${slotData.zoom.toFixed(2)}×`;
+                hudBadge.classList.remove('opacity-0');
+                clearTimeout(slotEl.__badgeHideTimer);
+                slotEl.__badgeHideTimer = setTimeout(() => hudBadge.classList.add('opacity-0'), 900);
+              }
+              updateInspectorHud();
+            }, { passive: false });
+
+          } else {
+            // Empty Slot Placeholder UI
+            const emptyPrompt = document.createElement('div');
+            emptyPrompt.className = 'w-full h-full flex flex-col items-center justify-center p-3 text-center pointer-events-none';
+            emptyPrompt.innerHTML = `
+              <div class="w-8 h-8 rounded-full bg-studio-800/90 border border-zinc-700 flex items-center justify-center mb-1.5 text-zinc-400">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <span class="text-[11px] font-semibold text-zinc-200">${slotRect.label}</span>
+              <span class="slot-dim-label text-[10px] font-mono text-zinc-400 mt-0.5">${Math.round(slotRect.w)}×${Math.round(slotRect.h)}px</span>
+              <span class="text-[9px] text-zinc-500 mt-1">Drop photo or click</span>
+            `;
+            slotEl.appendChild(emptyPrompt);
+
+            slotEl.addEventListener('click', (e) => {
+              if (e.target.dataset.resizeHandle) return;
+              e.stopPropagation();
+              state.activeSelection = { blockId: block.id, slotKey: slotRect.key };
+              updateInspectorHud();
+              triggerFileDialogForSlot(block.id, slotRect.key);
+            });
+          }
+
+          // Center-Anchored Interactive Resize Handle for Template D Foreground Box
+          if (slotRect.isOverlay && slotData) {
+            const resizeHandle = document.createElement('div');
+            resizeHandle.dataset.resizeHandle = 'true';
+            resizeHandle.title = 'Drag to resize center-anchored overlay box';
+            resizeHandle.className = 'absolute bottom-1.5 right-1.5 w-5 h-5 rounded bg-indigo-600/90 hover:bg-indigo-500 border border-white/50 shadow-md flex items-center justify-center cursor-nwse-resize z-30';
+            resizeHandle.innerHTML = `
+              <svg class="w-3 h-3 text-white pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            `;
+
+            resizeHandle.addEventListener('pointerdown', (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              state.activeSelection = { blockId: block.id, slotKey: slotRect.key };
+              document.querySelectorAll('.slot-active-ring').forEach(el => el.classList.remove('slot-active-ring'));
+              slotEl.classList.add('slot-active-ring');
+              updateInspectorHud();
+
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const startW = slotData.customW || slotRect.w;
+              const startH = slotData.customH || slotRect.h;
+
+              resizeHandle.setPointerCapture(e.pointerId);
+
+              const onResizeMove = (moveEvt) => {
+                // Multiply delta by 2 because the box is center-anchored (expands symmetrically left/right & top/bottom)
+                const dwBase = ((moveEvt.clientX - startX) / pScale) * 2;
+                const dhBase = ((moveEvt.clientY - startY) / pScale) * 2;
+
+                const editedAxis = Math.abs(dwBase) >= Math.abs(dhBase) ? 'w' : 'h';
+                applyOverlayDimensions(slotData, startW + dwBase, startH + dhBase, editedAxis);
+
+                const updatedRect = getTemplateSlotRects(block, state.frameHeight, state.slotGap)
+                  .find(r => r.key === slotRect.key);
+
+                if (updatedRect) {
+                  slotEl.style.left = `${updatedRect.x * pScale}px`;
+                  slotEl.style.top = `${updatedRect.y * pScale}px`;
+                  slotEl.style.width = `${updatedRect.w * pScale}px`;
+                  slotEl.style.height = `${updatedRect.h * pScale}px`;
+
+                  const dimLabel = slotEl.querySelector('.slot-dim-label');
+                  if (dimLabel) {
+                    dimLabel.textContent = `${Math.round(updatedRect.w)}×${Math.round(updatedRect.h)}px`;
+                  }
+
+                  if (imgEl && slotData.objectUrl) {
+                    const updatedMetrics = computeSlotCoverMetrics(slotData, updatedRect);
+                    if (updatedMetrics) {
+                      imgEl.style.width = `${updatedMetrics.renderedW * pScale}px`;
+                      imgEl.style.height = `${updatedMetrics.renderedH * pScale}px`;
+                      imgEl.style.left = `${updatedMetrics.drawX * pScale}px`;
+                      imgEl.style.top = `${updatedMetrics.drawY * pScale}px`;
+                    }
+                  }
+                }
+                updateInspectorHud();
+              };
+
+              const onResizeUp = (upEvt) => {
+                resizeHandle.releasePointerCapture(upEvt.pointerId);
+                resizeHandle.removeEventListener('pointermove', onResizeMove);
+                resizeHandle.removeEventListener('pointerup', onResizeUp);
+              };
+
+              resizeHandle.addEventListener('pointermove', onResizeMove);
+              resizeHandle.addEventListener('pointerup', onResizeUp);
+            });
+
+            slotEl.appendChild(resizeHandle);
+          }
+
+          stage.appendChild(slotEl);
+        });
+
+        // Template E Seam Indicator Line at x = 1080px
+        if (isPanorama) {
+          const seamLine = document.createElement('div');
+          seamLine.className = 'absolute top-0 bottom-0 pointer-events-none z-20 border-l-2 border-dashed border-indigo-400/80 flex flex-col items-center justify-between py-2';
+          seamLine.style.left = `${BASE_FRAME_WIDTH * pScale}px`;
+          seamLine.innerHTML = `
+            <span class="px-1.5 py-0.5 rounded bg-indigo-950/90 border border-indigo-400/50 text-[9px] font-mono text-indigo-200 -translate-x-1/2 shadow">
+              SPLIT SEAM (1080px)
+            </span>
+            <span class="px-1.5 py-0.5 rounded bg-indigo-950/90 border border-indigo-400/50 text-[9px] font-mono text-indigo-200 -translate-x-1/2 shadow">
+              ${String(startFrameNum).padStart(2, '0')} | ${String(endFrameNum).padStart(2, '0')}
+            </span>
+          `;
+          stage.appendChild(seamLine);
+        }
+
+        card.appendChild(stage);
+
+        // Card Footer Metadata
+        const footerMeta = document.createElement('div');
+        footerMeta.className = 'flex items-center justify-between px-1 text-[10px] font-mono text-zinc-500';
+        const outW = BASE_FRAME_WIDTH * state.exportScale;
+        const outH = state.frameHeight * state.exportScale;
+        footerMeta.innerHTML = `
+          <span>${isPanorama ? `Exports 2× (${outW}×${outH}px)` : `${outW}×${outH}px PNG`}</span>
+          <span>${block.bgColor.toUpperCase()}</span>
+        `;
+        card.appendChild(footerMeta);
+
+        strip.appendChild(card);
+      });
+
+      // Update Bottom Sequence Summary
+      const totalExportFrames = currentFrameNumber - 1;
+      const summaryEl = document.getElementById('sequenceSummaryText');
+      if (summaryEl) {
+        summaryEl.textContent = `${totalExportFrames} Export Frame${totalExportFrames === 1 ? '' : 's'} • ${state.blocks.length} Block${state.blocks.length === 1 ? '' : 's'}`;
+      }
+    }
+
+    /***************************************************************************
+     * 6. BLOCK & SLOT ACTIONS (ADD, SWITCH, MOVE, DUPLICATE, DELETE, INSPECTOR)
+     ***************************************************************************/
+    function addFrameBlock(templateType) {
+      const newBlock = createFrameBlock(templateType);
+      state.blocks.push(newBlock);
+      renderWorkspace();
+      updateInspectorHud();
+
+      // Smoothly scroll horizontal workspace to the newly added block
+      const ws = document.getElementById('workspaceContainer');
+      if (ws) {
+        setTimeout(() => {
+          ws.scrollTo({ left: ws.scrollWidth, behavior: 'smooth' });
+        }, 40);
+      }
+    }
+
+    function switchBlockTemplate(blockId, newTemplate) {
+      const block = state.blocks.find(b => b.id === blockId);
+      if (!block || block.template === newTemplate) return;
+
+      // Preserve any existing loaded images in order so switching templates doesn't lose photos
+      const existingLoadedSlots = Object.values(block.slots).filter(s => s && s.objectUrl);
+      const newSlotDefs = getTemplateSlotRects(newTemplate, state.frameHeight, state.slotGap);
+      const updatedSlots = {};
+
+      newSlotDefs.forEach((def, idx) => {
+        const carryOver = existingLoadedSlots[idx];
+        updatedSlots[def.key] = {
+          key: def.key,
+          objectUrl: carryOver ? carryOver.objectUrl : null,
+          fileName: carryOver ? carryOver.fileName : null,
+          naturalWidth: carryOver ? carryOver.naturalWidth : 0,
+          naturalHeight: carryOver ? carryOver.naturalHeight : 0,
+          zoom: 1.0,
+          panX: 0,
+          panY: 0,
+          customW: def.isOverlay ? state.defaultOverlayW : null,
+          customH: def.isOverlay ? state.defaultOverlayH : null,
+          lockAspect: def.isOverlay ? state.defaultOverlayLockAspect : true,
+          aspectRatio: def.isOverlay ? (state.defaultOverlayW / state.defaultOverlayH) : 0.8,
+          overlayShadow: state.defaultOverlayShadow,
+          overlayBorder: state.defaultOverlayBorder
+        };
+      });
+
+      block.template = newTemplate;
+      block.slots = updatedSlots;
+      state.activeSelection = null;
+      renderWorkspace();
+      updateInspectorHud();
+    }
+
+    function moveBlock(index, delta) {
+      const target = index + delta;
+      if (target < 0 || target >= state.blocks.length) return;
+      const [moved] = state.blocks.splice(index, 1);
+      state.blocks.splice(target, 0, moved);
+      renderWorkspace();
+    }
+
+    function duplicateBlock(index) {
+      const orig = state.blocks[index];
+      if (!orig) return;
+      const clone = JSON.parse(JSON.stringify(orig));
+      clone.id = 'blk_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+      state.blocks.splice(index + 1, 0, clone);
+      renderWorkspace();
+    }
+
+    function deleteBlock(index) {
+      if (state.blocks.length <= 1) {
+        showToast('At least 1 frame block must remain in the sequence.', false);
+        return;
+      }
+      const removed = state.blocks[index];
+      if (state.activeSelection && state.activeSelection.blockId === removed.id) {
+        state.activeSelection = null;
+      }
+      state.blocks.splice(index, 1);
+      renderWorkspace();
+      updateInspectorHud();
+    }
+
+    function triggerFileDialogForSlot(blockId, slotKey) {
+      const fileInput = document.getElementById('hiddenFileInput');
+      fileInput.value = '';
+      fileInput.onchange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          loadImageintoSlot(blockId, slotKey, file);
+        }
+      };
+      fileInput.click();
+    }
+
+    function getActiveSlotContext() {
+      if (!state.activeSelection) return null;
+      const block = state.blocks.find(b => b.id === state.activeSelection.blockId);
+      if (!block) return null;
+      const slot = block.slots[state.activeSelection.slotKey];
+      if (!slot) return null;
+      const slotDefs = getTemplateSlotRects(block, state.frameHeight, state.slotGap);
+      const slotRect = slotDefs.find(d => d.key === state.activeSelection.slotKey);
+      return { block, slot, slotRect };
+    }
+
+    function updateInspectorHud() {
+      const hud = document.getElementById('slotInspectorHud');
+      const ctx = getActiveSlotContext();
+
+      // Show HUD if slot has an image OR if it is Template D's resizable overlay slot
+      const isOverlaySlot = Boolean(ctx && ctx.slotRect && ctx.slotRect.isOverlay);
+      const hasPhoto = Boolean(ctx && ctx.slot && ctx.slot.objectUrl);
+
+      if (!ctx || (!hasPhoto && !isOverlaySlot)) {
+        hud.classList.add('hidden');
+        hud.classList.remove('flex');
+        return;
+      }
+
+      hud.classList.remove('hidden');
+      hud.classList.add('flex');
+
+      document.getElementById('activeSlotTitle').textContent = `Tpl ${ctx.block.template} • ${ctx.slotRect ? ctx.slotRect.label : ctx.slot.key}`;
+
+      // Photo Scale & Action Buttons visibility
+      const photoScaleControls = document.getElementById('photoScaleControls');
+      const photoActionButtons = document.getElementById('photoActionButtons');
+
+      if (hasPhoto) {
+        photoScaleControls.classList.remove('hidden');
+        photoScaleControls.classList.add('flex');
+        photoActionButtons.classList.remove('hidden');
+        photoActionButtons.classList.add('flex');
+
+        const zoomSlider = document.getElementById('activeZoomSlider');
+        const zoomLabel = document.getElementById('activeZoomLabel');
+        zoomSlider.value = ctx.slot.zoom || 1.0;
+        zoomLabel.textContent = `${(ctx.slot.zoom || 1.0).toFixed(2)}×`;
+      } else {
+        photoScaleControls.classList.add('hidden');
+        photoScaleControls.classList.remove('flex');
+        photoActionButtons.classList.add('hidden');
+        photoActionButtons.classList.remove('flex');
+      }
+
+      // Show Overlay Box Size, Lock Aspect, Shadow & Border controls when Template D Foreground slot is active
+      const overlayWrap = document.getElementById('overlayToggleWrap');
+      if (isOverlaySlot) {
+        overlayWrap.classList.remove('hidden');
+        overlayWrap.classList.add('flex');
+
+        const wInput = document.getElementById('activeOverlayWInput');
+        const hInput = document.getElementById('activeOverlayHInput');
+        if (document.activeElement !== wInput) {
+          wInput.value = Math.round(ctx.slot.customW || ctx.slotRect.w);
+        }
+        if (document.activeElement !== hInput) {
+          hInput.value = Math.round(ctx.slot.customH || ctx.slotRect.h);
+        }
+
+        const lockBtn = document.getElementById('toggleOverlayLockBtn');
+        const lockLabel = document.getElementById('overlayLockLabel');
+        if (ctx.slot.lockAspect) {
+          lockLabel.textContent = 'Locked';
+          lockBtn.className = 'px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 transition flex items-center gap-1';
+        } else {
+          lockLabel.textContent = 'Free';
+          lockBtn.className = 'px-2 py-0.5 rounded text-[11px] font-medium bg-studio-800 text-zinc-400 border border-studio-700 transition flex items-center gap-1';
+        }
+
+        document.getElementById('toggleOverlayShadowBtn').textContent = `Shadow: ${ctx.slot.overlayShadow ? 'ON' : 'OFF'}`;
+        document.getElementById('toggleOverlayBorderBtn').textContent = `Border: ${ctx.slot.overlayBorder ? 'ON' : 'OFF'}`;
+      } else {
+        overlayWrap.classList.add('hidden');
+        overlayWrap.classList.remove('flex');
+      }
+    }
+
+    /***************************************************************************
+     * 7. OFFSCREEN sRGB HTML5 CANVAS LOSSLESS PNG EXPORTER
+     *    Renders each frame at 1x (1080w) or 2x (2160w) with 0 compression,
+     *    slicing Template E cleanly into two sequential frames.
+     ***************************************************************************/
+    async function ensureImageLoaded(objectUrl) {
+      if (imageElementCache.has(objectUrl)) {
+        return imageElementCache.get(objectUrl);
+      }
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          imageElementCache.set(objectUrl, img);
+          resolve(img);
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+    }
+
+    async function renderBlockToCanvasBlobs(block) {
+      const scale = state.exportScale;
+      const isPanorama = block.template === 'E';
+      const span = isPanorama ? 2 : 1;
+
+      const fullBaseW = BASE_FRAME_WIDTH * span;
+      const fullBaseH = state.frameHeight;
+
+      const workCanvas = document.createElement('canvas');
+      workCanvas.width = fullBaseW * scale;
+      workCanvas.height = fullBaseH * scale;
+
+      let ctx = null;
+      try {
+        ctx = workCanvas.getContext('2d', { colorSpace: 'srgb', alpha: false });
+      } catch (_) {
+        ctx = workCanvas.getContext('2d');
+      }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Fill background matte
+      ctx.fillStyle = block.bgColor || '#ffffff';
+      ctx.fillRect(0, 0, workCanvas.width, workCanvas.height);
+
+      // Draw each photo slot in z-index order
+      const slotRects = getTemplateSlotRects(block, state.frameHeight, state.slotGap)
+        .sort((a, b) => (a.zIndex || 1) - (b.zIndex || 1));
+
+      for (const slotRect of slotRects) {
+        const slotData = block.slots[slotRect.key];
+        if (!slotData || !slotData.objectUrl) continue;
+
+        const img = await ensureImageLoaded(slotData.objectUrl);
+        const metrics = computeSlotCoverMetrics(slotData, slotRect);
+        if (!metrics) continue;
+
+        const sx = slotRect.x * scale;
+        const sy = slotRect.y * scale;
+        const sw = slotRect.w * scale;
+        const sh = slotRect.h * scale;
+
+        // Optional drop shadow for Template D overlay slot
+        if (slotRect.isOverlay && slotData.overlayShadow) {
+          ctx.save();
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+          ctx.shadowBlur = 42 * scale;
+          ctx.shadowOffsetY = 18 * scale;
+          ctx.fillStyle = block.bgColor || '#000000';
+          ctx.fillRect(sx, sy, sw, sh);
+          ctx.restore();
+        }
+
+        // Clip strictly to slot rectangle and draw image at cover-fit coordinates
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(sx, sy, sw, sh);
+        ctx.clip();
+
+        const imgDrawX = (slotRect.x + metrics.drawX) * scale;
+        const imgDrawY = (slotRect.y + metrics.drawY) * scale;
+        const imgDrawW = metrics.renderedW * scale;
+        const imgDrawH = metrics.renderedH * scale;
+
+        ctx.drawImage(img, imgDrawX, imgDrawY, imgDrawW, imgDrawH);
+        ctx.restore();
+
+        // Optional border for Template D overlay slot
+        if (slotRect.isOverlay && slotData.overlayBorder) {
+          ctx.save();
+          ctx.lineWidth = 12 * scale;
+          ctx.strokeStyle = block.bgColor || '#ffffff';
+          ctx.strokeRect(sx, sy, sw, sh);
+          ctx.restore();
+        }
+      }
+
+      // If single frame (Templates A, B, C, D, F), convert directly to lossless PNG blob
+      if (!isPanorama) {
+        const blob = await new Promise(res => workCanvas.toBlob(res, 'image/png'));
+        return [blob];
+      }
+
+      // If Template E (2-Frame Panorama), slice into left (Frame N) and right (Frame N+1)
+      const singleOutW = BASE_FRAME_WIDTH * scale;
+      const singleOutH = fullBaseH * scale;
+      const blobs = [];
+
+      for (let part = 0; part < 2; part++) {
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = singleOutW;
+        sliceCanvas.height = singleOutH;
+        const sCtx = sliceCanvas.getContext('2d');
+        sCtx.drawImage(
+          workCanvas,
+          part * singleOutW, 0, singleOutW, singleOutH,
+          0, 0, singleOutW, singleOutH
+        );
+        const partBlob = await new Promise(res => sliceCanvas.toBlob(res, 'image/png'));
+        blobs.push(partBlob);
+      }
+
+      return blobs;
+    }
+
+    async function exportSequence(asZip = true) {
+      try {
+        showToast('Rendering lossless sRGB PNG sequence...', true);
+        const zip = asZip && window.JSZip ? new window.JSZip() : null;
+        let frameCounter = 1;
+
+        for (const block of state.blocks) {
+          const blobs = await renderBlockToCanvasBlobs(block);
+          for (const blob of blobs) {
+            const fileName = `${String(frameCounter).padStart(2, '0')}_frame.png`;
+            if (zip) {
+              zip.file(fileName, blob);
+            } else {
+              triggerBlobDownload(blob, fileName);
+              await new Promise(r => setTimeout(r, 180));
+            }
+            frameCounter++;
+          }
+        }
+
+        if (zip) {
+          const zipBlob = await zip.generateAsync({
+            type: 'blob',
+            compression: 'STORE' // Zero compression for fastest lossless packaging
+          });
+          const ratioTag = state.frameHeight === 1350 ? '4x5' : (state.frameHeight === 1440 ? '3x4' : '9x16');
+          triggerBlobDownload(zipBlob, `ig_carousel_${ratioTag}_${frameCounter - 1}frames.zip`);
+        }
+
+        showToast(`Exported ${frameCounter - 1} lossless PNG frames!`, false);
+      } catch (err) {
+        console.error(err);
+        showToast('Export failed: ' + (err.message || 'Check console'), false);
+      }
+    }
+
+    function triggerBlobDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+
+    function showToast(message, isLoading = false) {
+      const toast = document.getElementById('statusToast');
+      const spinner = document.getElementById('toastSpinner');
+      const msgEl = document.getElementById('toastMessage');
+
+      toast.classList.remove('hidden');
+      toast.classList.add('flex');
+      msgEl.textContent = message;
+
+      if (isLoading) {
+        spinner.classList.remove('hidden');
+      } else {
+        spinner.classList.add('hidden');
+        clearTimeout(window.__toastTimer);
+        window.__toastTimer = setTimeout(() => {
+          toast.classList.add('hidden');
+          toast.classList.remove('flex');
+        }, 3400);
+      }
+    }
+
+    /***************************************************************************
+     * 8. INITIALIZATION & UI EVENT LISTENERS
+     ***************************************************************************/
+    function initDefaultCarousel() {
+      state.blocks = [
+        createFrameBlock('A'), // Frame 01: Full Frame (1 slot)
+        createFrameBlock('B'), // Frame 02: Top & Bottom (2 slots)
+        createFrameBlock('E'), // Frames 03 & 04: 2-Frame Split Panorama
+        createFrameBlock('D')  // Frame 05: BG + Overlay
+      ];
+      state.activeSelection = null;
+      renderWorkspace();
+      updateInspectorHud();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initDefaultCarousel();
+
+      // Settings & Export Popover Toggle Listeners
+      const settingsBtn = document.getElementById('settingsBtn');
+      const settingsMenu = document.getElementById('settingsMenu');
+      const exportMenuBtn = document.getElementById('exportMenuBtn');
+      const exportDropdownMenu = document.getElementById('exportDropdownMenu');
+
+      settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        exportDropdownMenu.classList.add('hidden');
+        settingsMenu.classList.toggle('hidden');
+      });
+
+      exportMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsMenu.classList.add('hidden');
+        exportDropdownMenu.classList.toggle('hidden');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!document.getElementById('settingsDropdownWrap').contains(e.target)) {
+          settingsMenu.classList.add('hidden');
+        }
+        if (!document.getElementById('exportDropdownWrap').contains(e.target)) {
+          exportDropdownMenu.classList.add('hidden');
+        }
+      });
+
+      // Format / Aspect Ratio Select
+      document.getElementById('aspectSelect').addEventListener('change', (e) => {
+        state.frameHeight = parseInt(e.target.value, 10) || 1350;
+        renderWorkspace();
+        updateInspectorHud();
+      });
+
+      // Output Resolution Multiplier (1x / 2x)
+      document.getElementById('scaleSelect').addEventListener('change', (e) => {
+        state.exportScale = parseInt(e.target.value, 10) || 1;
+        renderWorkspace();
+      });
+
+      // Global Slot Gap Slider
+      document.getElementById('gapSlider').addEventListener('input', (e) => {
+        state.slotGap = parseInt(e.target.value, 10) || 0;
+        document.getElementById('gapValueLabel').textContent = `${state.slotGap}px`;
+        renderWorkspace();
+      });
+
+      // Default Matte Color Picker
+      document.getElementById('globalBgInput').addEventListener('input', (e) => {
+        const newColor = e.target.value;
+        document.getElementById('globalBgHex').textContent = newColor.toUpperCase();
+        state.blocks.forEach(b => {
+          b.bgColor = newColor;
+        });
+        state.defaultBgColor = newColor;
+        renderWorkspace();
+      });
+
+      // Template D Defaults in Settings Menu
+      const defaultTplDW = document.getElementById('defaultTplDW');
+      const defaultTplDH = document.getElementById('defaultTplDH');
+      const defaultTplDLock = document.getElementById('defaultTplDLock');
+
+      function syncDefaultTemplateDToBlocks(editedAxis = 'w') {
+        let w = parseInt(defaultTplDW.value, 10) || 680;
+        let h = parseInt(defaultTplDH.value, 10) || 850;
+        w = Math.max(160, Math.min(BASE_FRAME_WIDTH, w));
+        h = Math.max(160, Math.min(state.frameHeight, h));
+
+        if (state.defaultOverlayLockAspect) {
+          const ratio = state.defaultOverlayRatio || 0.8;
+          if (editedAxis === 'w') {
+            h = Math.round(w / ratio);
+          } else {
+            w = Math.round(h * ratio);
+          }
+        } else {
+          state.defaultOverlayRatio = w / h;
+        }
+
+        state.defaultOverlayW = w;
+        state.defaultOverlayH = h;
+        defaultTplDW.value = w;
+        defaultTplDH.value = h;
+
+        // Also update existing Template D blocks
+        state.blocks.forEach(b => {
+          if (b.template === 'D' && b.slots.fg) {
+            b.slots.fg.customW = w;
+            b.slots.fg.customH = h;
+            b.slots.fg.lockAspect = state.defaultOverlayLockAspect;
+            b.slots.fg.aspectRatio = w / h;
+          }
+        });
+        renderWorkspace();
+        updateInspectorHud();
+      }
+
+      state.defaultOverlayRatio = 680 / 850; // 4:5
+
+      defaultTplDW.addEventListener('change', () => syncDefaultTemplateDToBlocks('w'));
+      defaultTplDH.addEventListener('change', () => syncDefaultTemplateDToBlocks('h'));
+      defaultTplDLock.addEventListener('change', (e) => {
+        state.defaultOverlayLockAspect = e.target.checked;
+        if (state.defaultOverlayLockAspect) {
+          state.defaultOverlayRatio = state.defaultOverlayW / state.defaultOverlayH;
+        }
+        state.blocks.forEach(b => {
+          if (b.template === 'D' && b.slots.fg) {
+            b.slots.fg.lockAspect = state.defaultOverlayLockAspect;
+          }
+        });
+        updateInspectorHud();
+      });
+
+      document.getElementById('resetTplDDefaultBtn').addEventListener('click', () => {
+        state.defaultOverlayW = 680;
+        state.defaultOverlayH = 850;
+        state.defaultOverlayRatio = 0.8;
+        state.defaultOverlayLockAspect = true;
+        defaultTplDW.value = 680;
+        defaultTplDH.value = 850;
+        defaultTplDLock.checked = true;
+        syncDefaultTemplateDToBlocks('w');
+      });
+
+      document.getElementById('defaultTplDShadow').addEventListener('change', (e) => {
+        state.defaultOverlayShadow = e.target.checked;
+        state.blocks.forEach(b => {
+          if (b.template === 'D' && b.slots.fg) b.slots.fg.overlayShadow = state.defaultOverlayShadow;
+        });
+        renderWorkspace();
+        updateInspectorHud();
+      });
+
+      document.getElementById('defaultTplDBorder').addEventListener('change', (e) => {
+        state.defaultOverlayBorder = e.target.checked;
+        state.blocks.forEach(b => {
+          if (b.template === 'D' && b.slots.fg) b.slots.fg.overlayBorder = state.defaultOverlayBorder;
+        });
+        renderWorkspace();
+        updateInspectorHud();
+      });
+
+      // Active Slot Zoom Slider
+      document.getElementById('activeZoomSlider').addEventListener('input', (e) => {
+        const ctx = getActiveSlotContext();
+        if (!ctx) return;
+        ctx.slot.zoom = parseFloat(e.target.value) || 1.0;
+        document.getElementById('activeZoomLabel').textContent = `${ctx.slot.zoom.toFixed(2)}×`;
+        renderWorkspace();
+      });
+
+      // Active Template D Foreground Box Pixel Width / Height / Lock Aspect Controls
+      document.getElementById('activeOverlayWInput').addEventListener('input', (e) => {
+        const ctx = getActiveSlotContext();
+        if (!ctx || !ctx.slotRect || !ctx.slotRect.isOverlay) return;
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val)) {
+          applyOverlayDimensions(ctx.slot, val, ctx.slot.customH || ctx.slotRect.h, 'w');
+          document.getElementById('activeOverlayHInput').value = ctx.slot.customH;
+          renderWorkspace();
+        }
+      });
+
+      document.getElementById('activeOverlayHInput').addEventListener('input', (e) => {
+        const ctx = getActiveSlotContext();
+        if (!ctx || !ctx.slotRect || !ctx.slotRect.isOverlay) return;
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val)) {
+          applyOverlayDimensions(ctx.slot, ctx.slot.customW || ctx.slotRect.w, val, 'h');
+          document.getElementById('activeOverlayWInput').value = ctx.slot.customW;
+          renderWorkspace();
+        }
+      });
+
+      document.getElementById('toggleOverlayLockBtn').addEventListener('click', () => {
+        const ctx = getActiveSlotContext();
+        if (!ctx || !ctx.slotRect || !ctx.slotRect.isOverlay) return;
+        ctx.slot.lockAspect = !ctx.slot.lockAspect;
+        if (ctx.slot.lockAspect) {
+          const w = ctx.slot.customW || ctx.slotRect.w;
+          const h = ctx.slot.customH || ctx.slotRect.h;
+          ctx.slot.aspectRatio = w / h;
+        }
+        updateInspectorHud();
+      });
+
+      // Template D Overlay Shadow & Border Toggles
+      document.getElementById('toggleOverlayShadowBtn').addEventListener('click', () => {
+        const ctx = getActiveSlotContext();
+        if (!ctx) return;
+        ctx.slot.overlayShadow = !ctx.slot.overlayShadow;
+        renderWorkspace();
+        updateInspectorHud();
+      });
+
+      document.getElementById('toggleOverlayBorderBtn').addEventListener('click', () => {
+        const ctx = getActiveSlotContext();
+        if (!ctx) return;
+        ctx.slot.overlayBorder = !ctx.slot.overlayBorder;
+        renderWorkspace();
+        updateInspectorHud();
+      });
+
+      // Active Slot Reset / Replace / Clear
+      document.getElementById('resetSlotFitBtn').addEventListener('click', () => {
+        const ctx = getActiveSlotContext();
+        if (!ctx) return;
+        ctx.slot.zoom = 1.0;
+        ctx.slot.panX = 0;
+        ctx.slot.panY = 0;
+        renderWorkspace();
+        updateInspectorHud();
+      });
+
+      document.getElementById('replaceSlotPhotoBtn').addEventListener('click', () => {
+        const ctx = getActiveSlotContext();
+        if (!ctx) return;
+        triggerFileDialogForSlot(ctx.block.id, ctx.slot.key);
+      });
+
+      document.getElementById('clearSlotPhotoBtn').addEventListener('click', () => {
+        const ctx = getActiveSlotContext();
+        if (!ctx) return;
+        ctx.slot.objectUrl = null;
+        ctx.slot.fileName = null;
+        ctx.slot.zoom = 1.0;
+        ctx.slot.panX = 0;
+        ctx.slot.panY = 0;
+        renderWorkspace();
+        updateInspectorHud();
+      });
+
+      // Workspace Preview Scale Slider
+      document.getElementById('previewScaleSlider').addEventListener('input', (e) => {
+        state.previewScale = parseFloat(e.target.value) || 0.28;
+        document.getElementById('previewScaleLabel').textContent = `${Math.round(state.previewScale * 100)}%`;
+        renderWorkspace();
+      });
+
+      // Reset Strip Button
+      document.getElementById('clearAllFramesBtn').addEventListener('click', () => {
+        initDefaultCarousel();
+        showToast('Carousel strip reset to default sequence.', false);
+      });
+
+      // Single Export Dropdown Options (ZIP or Individual PNGs)
+      document.getElementById('exportZipOptionBtn').addEventListener('click', () => {
+        exportDropdownMenu.classList.add('hidden');
+        exportSequence(true);
+      });
+      document.getElementById('exportPngOptionBtn').addEventListener('click', () => {
+        exportDropdownMenu.classList.add('hidden');
+        exportSequence(false);
+      });
+
+      // Click empty workspace background to deselect active slot
+      document.getElementById('workspaceContainer').addEventListener('click', (e) => {
+        if (e.target.id === 'workspaceContainer' || e.target.id === 'carouselStrip') {
+          state.activeSelection = null;
+          renderWorkspace();
+          updateInspectorHud();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
