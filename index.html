@@ -80,6 +80,15 @@
     input[type="number"]::-webkit-outer-spin-button {
       opacity: 1;
     }
+    /* Export Gallery Modal Styles */
+    .gallery { display: grid; gap: 16px; }
+    @media (min-width: 640px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 1024px) { .gallery { grid-template-columns: repeat(3, 1fr); } }
+    .gallery-item { background: #18181c; border: 1px solid #27272a; border-radius: 12px; overflow: hidden; }
+    .gallery-item img { width: 100%; height: auto; display: block; }
+    .gallery-label { padding: 12px; display: flex; justify-content: space-between; font-size: 0.75rem; color: #a1a1aa; font-family: monospace; }
+    .frame-num { font-weight: 600; color: #e4e4e7; }
+    .frame-res { color: #71717a; }
   </style>
 </head>
 <body class="h-screen w-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
@@ -220,10 +229,10 @@
           <div class="my-1 border-t border-studio-800"></div>
           <button id="exportPngOptionBtn" class="w-full px-3.5 py-2 text-left text-xs hover:bg-studio-800 flex items-center justify-between text-zinc-100 transition">
             <div>
-              <div class="font-semibold">Individual Files (.png)</div>
-              <div class="text-[10px] text-zinc-400">Sequential browser downloads</div>
+              <div class="font-semibold">Open Gallery (Save to Photos)</div>
+              <div class="text-[10px] text-zinc-400">Tap to open, long-press to save</div>
             </div>
-            <span class="text-[10px] font-mono bg-studio-800 text-zinc-300 px-1.5 py-0.5 rounded">PNG</span>
+            <span class="text-[10px] font-mono bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">GALLERY</span>
           </button>
         </div>
       </div>
@@ -1478,6 +1487,7 @@
         showToast('Rendering lossless sRGB PNG sequence...', true);
         const zip = asZip && window.JSZip ? new window.JSZip() : null;
         let frameCounter = 1;
+        const galleryFrames = [];
 
         for (const block of state.blocks) {
           const blobs = await renderBlockToCanvasBlobs(block);
@@ -1486,8 +1496,7 @@
             if (zip) {
               zip.file(fileName, blob);
             } else {
-              triggerBlobDownload(blob, fileName);
-              await new Promise(r => setTimeout(r, 180));
+              galleryFrames.push({ blob, frameNum: frameCounter });
             }
             frameCounter++;
           }
@@ -1500,6 +1509,8 @@
           });
           const ratioTag = state.frameHeight === 1350 ? '4x5' : (state.frameHeight === 1440 ? '3x4' : '9x16');
           triggerBlobDownload(zipBlob, `ig_carousel_${ratioTag}_${frameCounter - 1}frames.zip`);
+        } else if (galleryFrames.length > 0) {
+          openGalleryView(galleryFrames);
         }
 
         showToast(`Exported ${frameCounter - 1} lossless PNG frames!`, false);
@@ -1518,6 +1529,114 @@
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+
+    function openGalleryView(frames) {
+      // Create modal overlay in current page - avoids popup blockers entirely
+      const ratioTag = state.frameHeight === 1350 ? '4:5 (1080×1350)' :
+                       state.frameHeight === 1440 ? '3:4 (1080×1440)' : '9:16 (1080×1920)';
+      const scaleTag = state.exportScale === 2 ? ' @2x Retina' : '';
+      const outW = BASE_FRAME_WIDTH * state.exportScale;
+      const outH = state.frameHeight * state.exportScale;
+
+      const objectUrls = [];
+      const imagesHtml = frames.map((f) => {
+        const url = URL.createObjectURL(f.blob);
+        objectUrls.push(url);
+        const frameLabel = String(f.frameNum).padStart(2, '0');
+        return `
+          <div class="gallery-item">
+            <img src="${url}" alt="Frame ${frameLabel}" loading="lazy" />
+            <div class="gallery-label">
+              <span class="frame-num">Frame ${frameLabel}</span>
+              <span class="frame-res">${outW}×${outH}px</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Remove any existing gallery modal
+      const existing = document.getElementById('exportGalleryModal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'exportGalleryModal';
+      modal.className = 'fixed inset-0 z-50 flex items-center justify-center';
+      modal.innerHTML = `
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeExportGallery()"></div>
+
+        <!-- Gallery Panel -->
+        <div class="relative bg-studio-900 border border-studio-700 rounded-2xl shadow-2xl max-h-[90vh] w-full max-w-7xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <!-- Header -->
+          <div class="header flex items-center justify-between p-4 border-b border-studio-700 shrink-0">
+            <div>
+              <h1 class="text-lg font-semibold text-white">IG Carousel Export Gallery</h1>
+              <div class="text-[11px] font-mono text-zinc-400 mt-0.5">${frames.length} frame${frames.length !== 1 ? 's' : ''} • ${ratioTag}${scaleTag}</div>
+            </div>
+            <button onclick="closeExportGallery()" class="p-2 rounded-lg bg-studio-800 hover:bg-studio-700 text-zinc-300 hover:text-white transition" aria-label="Close gallery">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Instructions -->
+          <div class="instruction px-4 py-3 border-b border-studio-700 shrink-0 bg-studio-950/50">
+            <div class="flex items-center gap-2 text-sm text-zinc-300">
+              <svg class="w-4 h-4 text-indigo-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+              </svg>
+              <span><strong>iOS/iPadOS:</strong> Long-press any image → <strong class="text-indigo-300">"Add to Photos"</strong></span>
+            </div>
+            <div class="flex items-center gap-2 text-sm text-zinc-300 mt-1.5">
+              <svg class="w-4 h-4 text-indigo-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+              </svg>
+              <span><strong>Desktop:</strong> Right-click any image → <strong class="text-indigo-300">"Save Image As..."</strong></span>
+            </div>
+          </div>
+
+          <!-- Gallery Grid -->
+          <div class="gallery p-4 overflow-y-auto flex-1" style="max-height: 65vh;">
+            ${imagesHtml}
+          </div>
+
+          <!-- Footer -->
+          <div class="footer px-4 py-3 border-t border-studio-700 shrink-0 bg-studio-950/50 text-center text-[11px] text-zinc-500">
+            Generated by IG Carousel Studio • ${new Date().toLocaleDateString()}
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Prevent body scroll while gallery is open
+      document.body.style.overflow = 'hidden';
+
+      // Store object URLs for cleanup
+      modal._objectUrls = objectUrls;
+
+      // Add global close function
+      window.closeExportGallery = () => {
+        const m = document.getElementById('exportGalleryModal');
+        if (m) {
+          // Revoke object URLs
+          (m._objectUrls || []).forEach(u => URL.revokeObjectURL(u));
+          m.remove();
+          document.body.style.overflow = '';
+        }
+      };
+
+      // Close on Escape key
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          closeExportGallery();
+          document.removeEventListener('keydown', onKeyDown);
+        }
+      };
+      document.addEventListener('keydown', onKeyDown);
+      modal._keydownHandler = onKeyDown;
     }
 
     function showToast(message, isLoading = false) {
